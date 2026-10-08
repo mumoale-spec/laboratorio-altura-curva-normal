@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laboratorio interactivo · Datos individuales, normal y p-valor</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#172033;--muted:#687187;--line:#dfe4ee;--accent:#3659d9;--soft:#eef2ff;--danger:#d64545}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:26px 24px 12px;max-width:1200px;margin:auto} h1{margin:0;font-size:clamp(24px,4vw,38px)} .sub{color:var(--muted);margin-top:7px}
+.tabs{display:flex;gap:8px;max-width:1200px;margin:8px auto 18px;padding:0 24px;flex-wrap:wrap}
+button{border:1px solid var(--line);background:#fff;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:650;color:var(--ink)}
+button.active,button.primary{background:var(--accent);color:white;border-color:var(--accent)}
+main{max-width:1200px;margin:auto;padding:0 24px 40px}.panel{display:none}.panel.active{display:block}
+.grid{display:grid;grid-template-columns:340px 1fr;gap:18px}@media(max-width:850px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 3px 14px #1b2a4a0a}
+h2,h3{margin-top:0} label{font-size:13px;font-weight:700;display:block;margin:13px 0 6px}
+textarea,input,select{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px;background:white;color:var(--ink)}
+textarea{height:120px;resize:vertical}.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}.hint,.small{font-size:12px;color:var(--muted);line-height:1.45}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--soft);padding:10px;border-radius:10px}.stat b{display:block;font-size:20px}.stat span{font-size:11px;color:var(--muted)}
+canvas{width:100%;height:430px;display:block}.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+.dot{width:10px;height:10px;display:inline-block;border-radius:50%;margin-right:5px}.blue{background:#3659d9}.orange{background:#e08a24}.red{background:#d64545}
+.callout{background:#f8fafc;border-left:4px solid var(--accent);padding:12px 14px;border-radius:8px;margin-top:12px;line-height:1.5}
+.chart-wrap{position:relative}.chart-tooltip{position:absolute;display:none;pointer-events:none;background:#172033;color:white;padding:8px 11px;border-radius:9px;font-size:12px;box-shadow:0 4px 18px #17203330;white-space:nowrap;z-index:3;transform:translate(-50%,-100%)}.rangeval{text-align:center;font-size:30px;font-weight:800;margin:5px 0}.checks{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px}
+input[type=checkbox]{width:auto}.footer{font-size:11px;color:var(--muted);margin-top:15px}
+</style>
+</head>
+<body>
+<header><h1>Laboratorio de la campana de Gauss</h1><div class="sub">Explora cómo se comportan tus datos y por qué un resultado más extremo suele producir un p-valor menor.</div></header>
+<div class="tabs">
+<button class="tab active" data-tab="datos">1 · Mis datos vs. normal</button>
+<button class="tab" data-tab="pvalor">2 · Campana, z y p-valor</button>
+</div>
+<main>
+<section id="datos" class="panel active">
+<div class="grid">
+<div class="card">
+<h3>Introduce tus datos</h3>
+<label>Datos de tu grupo (por ejemplo, alturas en cm)</label>
+<textarea id="dataInput">152, 158, 160, 160, 163, 165, 168, 170, 170, 172, 174, 176, 180</textarea>
+<div class="row"><button class="primary" id="drawBtn">Dibujar</button><button id="clearBtn">Limpiar</button></div>
+<label>Generar ejemplo</label>
+<div class="row"><select id="genType"><option value="normal">Normal</option><option value="right">Sesgada a la derecha</option><option value="bimodal">Bimodal</option><option value="uniform">Uniforme</option></select><input id="nGen" type="number" min="10" max="1000" value="100"></div>
+<button id="genBtn" style="width:100%;margin-top:8px">Generar datos</button>
+<label>Añadir una altura, de una en una (opcional)</label><p class="hint">Sirve para introducir un nuevo alumno durante la clase. También puedes pegar todos los datos en el cuadro superior.</p>
+<div class="row"><input id="singleValue" type="number" step="any" placeholder="Ej. 132"><button id="addOneBtn">Añadir altura</button></div>
+<div class="checks" style="margin-top:14px">
+<label><input id="showNormal" type="checkbox" checked> Curva normal</label>
+<label><input id="showHist" type="checkbox" checked> Histograma</label>
+<label><input id="showDots" type="checkbox" checked> Cada persona (puntos)</label>
+<label><input id="showCounts" type="checkbox" checked> Recuentos por barra</label>
+<label><input id="showSD" type="checkbox" checked> ±1, ±2, ±3 DT</label>
+</div>
+<p class="hint">En el panel inferior, <b>cada punto representa exactamente un dato y se sitúa en su valor real</b>. Los valores iguales se apilan sin superponerse. La curva naranja representa la normal ajustada a tus datos.</p>
+</div>
+<div class="card">
+<h2>Distribución observada vs. normal esperada</h2>
+<div class="stats"><div class="stat"><b id="sN">–</b><span>n</span></div><div class="stat"><b id="sMean">–</b><span>Media</span></div><div class="stat"><b id="sSd">–</b><span>DT</span></div><div class="stat"><b id="sWithin">–</b><span>Dentro de ±2 DT</span></div></div>
+<div class="chart-wrap"><canvas id="dataCanvas"></canvas><div class="chart-tooltip" id="histTooltip"></div></div>
+<div class="legend"><span><i class="dot blue"></i>1 punto = 1 persona, en su valor real</span><span><i class="dot orange"></i>Normal ajustada</span><span><i class="dot red"></i>Último dato añadido (contorno rojo)</span></div>
+<div class="callout" id="dataMsg"></div>
+</div>
+</div>
+</section>
+
+<section id="pvalor" class="panel">
+<div class="grid">
+<div class="card">
+<h3>Mueve el resultado</h3>
+<p class="hint">Imagina que H₀ es cierta. El centro (z = 0) es lo más esperable. Muévete hacia las colas.</p>
+<label>z = número de DT desde el centro</label>
+<input id="zSlider" type="range" min="0" max="4" step="0.01" value="1.96">
+<div class="rangeval">z = <span id="zVal">1.96</span></div>
+<label>Tipo de contraste</label>
+<select id="tails"><option value="2">Bilateral (dos colas)</option><option value="1">Unilateral (una cola)</option></select>
+<label>Nivel de significación α</label>
+<select id="alpha"><option value=".05">0,05 (95%)</option><option value=".01">0,01 (99%)</option><option value=".001">0,001 (99,9%)</option></select>
+<div class="callout"><b>Idea:</b> α es la frontera que decides. El p-valor es el área de resultados tan extremos o más que el observado, suponiendo H₀ cierta.</div>
+</div>
+<div class="card">
+<h2>¿Dónde cae tu resultado?</h2>
+<div class="stats"><div class="stat"><b id="pv">–</b><span>p-valor</span></div><div class="stat"><b id="sig">–</b><span>Decisión con α</span></div><div class="stat"><b id="pct">–</b><span>Percentil aprox.</span></div><div class="stat"><b id="rarity">–</b><span>Interpretación</span></div></div>
+<canvas id="pCanvas"></canvas>
+<div class="legend"><span><i class="dot orange"></i>Distribución esperada si H₀ es cierta</span><span><i class="dot red"></i>Área del p-valor</span></div>
+<div class="callout" id="pMsg"></div>
+</div>
+</div>
+</section>
+<div class="footer">Herramienta docente. La relación z–p mostrada corresponde a la distribución normal estándar; pruebas estadísticas reales pueden usar otras distribuciones y supuestos.</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active'); if(b.dataset.tab==='pvalor') drawP(); else drawData();});
+function erf(x){let s=x>=0?1:-1;x=Math.abs(x);let a1=.254829592,a2=-.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=.3275911,t=1/(1+p*x);let y=1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);return s*y}
+function cdf(z){return .5*(1+erf(z/Math.sqrt(2)))}
+function parseData(){return $('dataInput').value.split(/[\s,;]+/).filter(s=>s.trim()!=='').map(Number).filter(Number.isFinite)}
+function stats(a){let n=a.length,m=a.reduce((x,y)=>x+y,0)/n,sd=Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(n-1||1));return{n,m,sd}}
+function prep(c,h=430){let dpr=devicePixelRatio||1,r=c.getBoundingClientRect();c.style.height=h+'px';c.width=Math.round(r.width*dpr);c.height=Math.round(h*dpr);let x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,r.width,h);return[x,r.width,h]}
+function line(ctx,x1,y1,x2,y2,style='#dfe4ee',w=1){ctx.strokeStyle=style;ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()}
+function text(ctx,t,x,y,align='center',color='#687187',size=11){ctx.fillStyle=color;ctx.font=`${size}px system-ui`;ctx.textAlign=align;ctx.fillText(t,x,y)}
+let histInfo=null;
+let lastAdded=null;
+let previousBeforeAdd=null;
+function formatNumber(v){return Number(v.toFixed(3)).toLocaleString('es-ES',{maximumFractionDigits:3})}
+function drawData(){
+ const a=parseData(),n=a.length;
+ const m=n?a.reduce((x,y)=>x+y,0)/n:NaN;
+ const sd=n>1?Math.sqrt(a.reduce((acc,v)=>acc+(v-m)**2,0)/(n-1)):NaN;
+ $('sN').textContent=n;
+ $('sMean').textContent=Number.isFinite(m)?m.toFixed(2):'–';
+ $('sSd').textContent=Number.isFinite(sd)?sd.toFixed(2):'–';
+ const within=n>1&&sd>0?a.filter(v=>Math.abs(v-m)<=2*sd).length/n*100:NaN;
+ $('sWithin').textContent=Number.isFinite(within)?within.toFixed(1)+'%':'–';
+ const canvas=$('dataCanvas'),W=canvas.getBoundingClientRect().width;
+ const padL=52,padR=22,pw=Math.max(40,W-padL-padR);
+ const aMin=n?Math.min(...a):0,aMax=n?Math.max(...a):1;
+ let lo=n?Math.min(aMin,sd>0?m-3.2*sd:aMin-10):0;
+ let hi=n?Math.max(aMax,sd>0?m+3.2*sd:aMax+10):100;
+ const extra=Math.max((hi-lo)*.045,.4);lo-=extra;hi+=extra;
+ const X=v=>padL+(v-lo)/(hi-lo)*pw;
+ const dotRadius=n<=100?4.3:n<=350?3.25:2.3;
+ const step=2*dotRadius+1.8;
+ const rowLastX=[];
+ // Un punto por dato, situado exactamente en su x real. Si los puntos colisionan,
+ // se apilan VERTICALMENTE, nunca se desplazan a otro valor del eje horizontal.
+ const dots=a.map((v,i)=>({v,i})).sort((a,b)=>a.v-b.v||a.i-b.i).map(item=>{
+   const x=X(item.v);
+   let row=0;
+   while(rowLastX[row]!==undefined && x-rowLastX[row]<step)row++;
+   rowLastX[row]=x;
+   return {...item,x,row};
+ });
+ const histTop=36,histBottom=320,dotTop=373;
+ const dotHeight=Math.max(115,rowLastX.length*step+25);
+ const dotBottom=dotTop+dotHeight;
+ const H=dotBottom+55;
+ const [ctx]=prep(canvas,H);
+ const bins=Math.max(7,Math.min(25,Math.round(Math.sqrt(Math.max(2,n))*1.5)));
+ const bw=(hi-lo)/bins,counts=Array(bins).fill(0);
+ a.forEach(v=>{let i=Math.min(bins-1,Math.max(0,Math.floor((v-lo)/bw)));counts[i]++});
+ const normPeak=n&&sd>0?n*bw/(sd*Math.sqrt(2*Math.PI)):0;
+ const ymax=Math.max(1,...counts,normPeak)*1.19;
+ const Y=v=>histBottom-(v/ymax)*(histBottom-histTop);
+ const dotBase=dotBottom-18;
+ dots.forEach(p=>p.y=dotBase-p.row*step);
+ histInfo={lo,hi,bw,bins,counts,n,dots,dotRadius,padL,pw,histTop,histBottom,dotTop,dotBottom,H};
+ // Las dos vistas comparten el mismo eje X, de menor a mayor.
+ const rawTick=(hi-lo)/6,pow=Math.pow(10,Math.floor(Math.log10(rawTick)));
+ const tickStep=[1,2,2.5,5,10].map(x=>x*pow).find(x=>x>=rawTick)||10*pow;
+ for(let v=Math.ceil(lo/tickStep)*tickStep;v<=hi+tickStep*1e-8;v+=tickStep){
+   const x=X(v);
+   line(ctx,x,histTop,x,dotBottom,'#e9edf5',1);
+   text(ctx,formatNumber(v),x,H-26,'center','#556177',11);
+ }
+ text(ctx,'Histograma + curva normal',padL,histTop-17,'left','#172033',13);
+ text(ctx,'Cada punto = una persona (altura exacta)',padL,dotTop-20,'left','#172033',13);
+ line(ctx,padL,histBottom,W-padR,histBottom,'#9aa5b8',1.2);
+ line(ctx,padL,dotBottom+3,W-padR,dotBottom+3,'#9aa5b8',1.2);
+ text(ctx,'Valor / altura (cm)',W/2,H-5,'center','#687187',11);
+ if($('showHist').checked){
+   counts.forEach((c,i)=>{
+     ctx.fillStyle='rgba(54,89,217,.22)';
+     const x1=X(lo+i*bw),x2=X(lo+(i+1)*bw);
+     ctx.fillRect(x1+1,Y(c),Math.max(1,x2-x1-2),histBottom-Y(c));
+   });
+ }
+ if($('showSD').checked&&sd>0){
+   [-3,-2,-1,0,1,2,3].forEach(k=>{
+     const v=m+k*sd;
+     if(v>=lo&&v<=hi){
+       const x=X(v);
+       line(ctx,x,histTop,x,histBottom,k===0?'#344054':'#aeb8c9',k===0?1.8:1);
+       text(ctx,k===0?'Media':(k>0?'+':'')+k+' DT',x,histTop+14,'center','#536178',10);
+     }
+   });
+ }
+ if($('showNormal').checked&&sd>0){
+   ctx.strokeStyle='#e08a24';ctx.lineWidth=3;ctx.beginPath();
+   for(let i=0;i<=400;i++){
+     const v=lo+(hi-lo)*i/400;
+     const d=n*bw/(sd*Math.sqrt(2*Math.PI))*Math.exp(-.5*((v-m)/sd)**2);
+     i?ctx.lineTo(X(v),Y(d)):ctx.moveTo(X(v),Y(d));
+   }
+   ctx.stroke();
+ }
+ if($('showCounts').checked){
+   counts.forEach((c,i)=>{
+     if(!c)return;
+     const x=X(lo+(i+.5)*bw),y=Math.max(histTop+32,Y(c)-7);
+     const label=String(c);
+     ctx.font='bold 11px system-ui';const tw=ctx.measureText(label).width;
+     ctx.fillStyle='rgba(255,255,255,.91)';ctx.fillRect(x-tw/2-3,y-12,tw+6,15);
+     text(ctx,label,x,y,'center','#294bb6',11);
+   });
+ }
+ if(lastAdded!==null&&a[lastAdded]!==undefined){
+   const v=a[lastAdded],x=X(v);
+   ctx.save();ctx.setLineDash([4,4]);line(ctx,x,histTop,x,dotBottom,'#d64545',1.4);ctx.restore();
+   const label=`Nuevo: ${formatNumber(v)} cm`;
+   const lx=Math.max(75,Math.min(W-90,x));
+   ctx.font='bold 12px system-ui';const tw=ctx.measureText(label).width;
+   ctx.fillStyle='#fff6eb';ctx.fillRect(lx-tw/2-7,dotTop-4,tw+14,22);
+   text(ctx,label,lx,dotTop+12,'center','#b45309',12);
+ }
+ if($('showDots').checked){
+   // Cada círculo es un dato, en su x exacta; apilado vertical sin solapamientos.
+   dots.forEach(p=>{
+     const isNew=lastAdded!==null&&p.i===lastAdded;
+     ctx.beginPath();ctx.arc(p.x,p.y,dotRadius,0,Math.PI*2);
+     ctx.fillStyle=isNew?'#f59e0b':'#3659d9';ctx.fill();
+     ctx.strokeStyle=isNew?'#d64545':'white';ctx.lineWidth=isNew?2.3:.8;ctx.stroke();
+   });
+ }
+ if(n===0){
+   text(ctx,'Introduce alturas o genera un ejemplo para comenzar',W/2,histTop+135,'center','#687187',14);
+   $('dataMsg').textContent='Introduce datos en el cuadro o añade una altura de una en una.';
+ }else{
+   const normalText=Number.isFinite(within)?`<b>${within.toFixed(1)}%</b> está dentro de ±2 DT (en una normal ideal: ≈95%).`:'Todavía no se puede calcular la DT para ajustar una normal.';
+   const added=lastAdded!==null&&a[lastAdded]!==undefined?` <b>Última altura: ${formatNumber(a[lastAdded])} cm</b>, marcada en naranja y con línea roja.`:'';
+   $('dataMsg').innerHTML=`<b>${n} datos = ${n} puntos individuales.</b> Los puntos están colocados en su valor exacto y los repetidos se apilan verticalmente. ${normalText}${added}`;
+ }
+}
+$('drawBtn').onclick=drawData;
+$('clearBtn').onclick=()=>{$('dataInput').value='';lastAdded=null;drawData()};
+$('dataInput').addEventListener('input',()=>{lastAdded=null;drawData()});
+['showNormal','showHist','showDots','showCounts','showSD'].forEach(id=>$(id).onchange=drawData);
+$('addOneBtn').onclick=()=>{
+ const raw=$('singleValue').value.trim(),v=Number(raw);
+ if(!raw||!Number.isFinite(v)){ $('singleValue').focus();return; }
+ // Ordenamos numéricamente la lista para que un 132 aparezca ANTES que 152.
+ const a=parseData();a.push(v);a.sort((x,y)=>x-y);
+ lastAdded=a.lastIndexOf(v);
+ $('dataInput').value=a.join(', ');
+ $('singleValue').value='';drawData();$('singleValue').focus();
+};
+$('singleValue').addEventListener('keydown',e=>{if(e.key==='Enter')$('addOneBtn').click()});
+$('dataCanvas').addEventListener('mousemove',e=>{
+ if(!histInfo)return;
+ const {lo,hi,bw,bins,counts,n,dots,dotRadius,padL,pw,histTop,histBottom,dotTop,dotBottom}=histInfo;
+ const rect=e.currentTarget.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+ const tip=$('histTooltip');let msg='';
+ if(y>=dotTop-5&&y<=dotBottom+5&&$('showDots').checked){
+   let nearest=null,d2=Infinity;
+   for(const p of dots){const dist=(p.x-x)**2+(p.y-y)**2;if(dist<d2){nearest=p;d2=dist}}
+   if(nearest&&d2<=(dotRadius+5)**2){
+     const count=dots.filter(p=>p.v===nearest.v).length;
+     msg=`Altura exacta: <b>${formatNumber(nearest.v)} cm</b> · ${count} ${count===1?'persona':'personas'} con ese valor`;
+   }
+ }else if(x>=padL&&x<=padL+pw&&y>=histTop&&y<=histBottom){
+   const v=lo+(x-padL)/pw*(hi-lo),i=Math.max(0,Math.min(bins-1,Math.floor((v-lo)/bw)));
+   msg=`Intervalo ${formatNumber(lo+i*bw)}–${formatNumber(lo+(i+1)*bw)}: <b>${counts[i]} datos</b> (${n?(100*counts[i]/n).toFixed(1):'0'}%)`;
+ }
+ if(!msg){tip.style.display='none';return}
+ tip.innerHTML=msg;tip.style.display='block';
+ tip.style.left=Math.min(rect.width-110,Math.max(110,x))+'px';
+ tip.style.top=Math.max(42,y-9)+'px';
+});
+$('dataCanvas').addEventListener('mouseleave',()=>{$('histTooltip').style.display='none'});
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+$('genBtn').onclick=()=>{let n=+$('nGen').value,t=$('genType').value,a=[];for(let i=0;i<n;i++){let v=t==='normal'?170+10*randn():t==='right'?150+8*(-Math.log(Math.random())):t==='bimodal'?(Math.random()<.5?158:182)+5*randn():145+40*Math.random();a.push(v.toFixed(1))}$('dataInput').value=a.join(', ');lastAdded=null;drawData()};
+
+function drawP(){
+ let z=+$('zSlider').value,tails=+$('tails').value,alpha=+$('alpha').value,p=(1-cdf(z))*tails;p=Math.min(1,p);
+ $('zVal').textContent=z.toFixed(2);$('pv').textContent=p<.0001?'<0,0001':p.toFixed(4).replace('.',',');$('sig').textContent=p<alpha?'Significativo':'No significativo';
+ $('pct').textContent=(cdf(z)*100).toFixed(1)+'%';$('rarity').textContent=z<1?'Común':z<2?'Poco raro':z<3?'Raro':'Muy raro';
+ let [ctx,W,H]=prep($('pCanvas')),pad={l:35,r:20,t:20,b:42},pw=W-pad.l-pad.r,ph=H-pad.t-pad.b,min=-4,max=4,peak=1/Math.sqrt(2*Math.PI);
+ let X=v=>pad.l+(v-min)/(max-min)*pw,Y=v=>pad.t+ph-v/peak*ph*.88;
+ line(ctx,pad.l,pad.t+ph,W-pad.r,pad.t+ph);
+ [-3,-2,-1,0,1,2,3].forEach(k=>{line(ctx,X(k),pad.t,X(k),pad.t+ph,'#edf0f5');text(ctx,(k>0?'+':'')+k+' DT',X(k),H-18)});
+ function dens(x){return peak*Math.exp(-x*x/2)}
+ ctx.fillStyle='rgba(214,69,69,.28)';
+ function shade(a,b){ctx.beginPath();ctx.moveTo(X(a),Y(0));for(let i=0;i<=120;i++){let x=a+(b-a)*i/120;ctx.lineTo(X(x),Y(dens(x)))}ctx.lineTo(X(b),Y(0));ctx.closePath();ctx.fill()}
+ shade(z,4);if(tails===2)shade(-4,-z);
+ ctx.strokeStyle='#e08a24';ctx.lineWidth=3;ctx.beginPath();for(let i=0;i<=300;i++){let x=-4+8*i/300;i?ctx.lineTo(X(x),Y(dens(x))):ctx.moveTo(X(x),Y(dens(x)))}ctx.stroke();
+ line(ctx,X(z),pad.t,X(z),pad.t+ph,'#d64545',3);text(ctx,'Tu resultado',X(z),pad.t+13,'center','#d64545',12);
+ $('pMsg').innerHTML=p<alpha?`Si <b>H₀ fuera cierta</b>, obtener un resultado como este o más extremo tendría una probabilidad aproximada de <b>${(p*100).toFixed(2).replace('.',',')}%</b>. Como p &lt; α (${alpha.toString().replace('.',',')}), lo llamamos <b>estadísticamente significativo</b>.`:`Si <b>H₀ fuera cierta</b>, resultados como este o más extremos no son suficientemente raros con el criterio elegido: p = <b>${p.toFixed(4).replace('.',',')}</b> y α = <b>${alpha.toString().replace('.',',')}</b>.`;
+}
+$('zSlider').oninput=drawP;$('tails').onchange=drawP;$('alpha').onchange=drawP;
+window.onresize=()=>{document.querySelector('#datos.active')?drawData():drawP()};drawData();drawP();
+</script>
+</body></html>
